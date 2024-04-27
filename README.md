@@ -1,3 +1,8 @@
+# Oberon RISC Emulator (Zig Version)
+
+This is an attempt to rewrite Peter De Watcher's Oberon Risc Emulator in the Zig language, mainly for the purpose of learning Zig.
+What follows is the original README.md
+
 # Oberon RISC Emulator
 
 This is an emulator for the Oberon RISC machine. For more information,
