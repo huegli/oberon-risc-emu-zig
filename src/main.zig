@@ -2,79 +2,99 @@ const std = @import("std");
 const SDL = @import("sdl2");
 const target_os = @import("builtin").os;
 
-pub fn main() !void {
-    try SDL.init(.{
-        .video = true,
-        .events = true,
-        .audio = true,
-    });
-    defer SDL.quit();
+const FPS = 60;
 
-    var window = try SDL.createWindow(
-        "SDL.zig Basic Demo",
-        .{ .centered = {} },
-        .{ .centered = {} },
+pub fn main() !void {
+    const fullscreen = false;
+    var zoom: f64 = 0.0;
+
+    const risc_rect = SDL.SDL_Rect{
+        .x = 0,
+        .y = 0,
+        .w = 640,
+        .h = 480,
+    };
+
+    if (SDL.SDL_Init(SDL.SDL_INIT_VIDEO) < 0)
+        sdlPanic();
+    defer SDL.SDL_Quit();
+
+    SDL.SDL_EnableScreenSaver();
+    _ = SDL.SDL_ShowCursor(0);
+    _ = SDL.SDL_SetHint(SDL.SDL_HINT_RENDER_SCALE_QUALITY, "best");
+
+    var window_flags: u32 = SDL.SDL_WINDOW_HIDDEN;
+    var display: c_uint = 0;
+
+    if (fullscreen) {
+        window_flags |= SDL.SDL_WINDOW_FULLSCREEN_DESKTOP;
+        display = 0;
+    }
+    if (zoom == 0.0) {
+        // SDL_Rect bounds;
+        // if (SDL_GetDisplayBounds(display, &bounds) == 0 &&
+        //     bounds.h >= risc_rect.h * 2 && bounds.w >= risc_rect.w * 2) {
+        // zoom = 2;
+        // } else {
+        // zoom = 1;
+        // }
+        zoom = 1.0;
+    }
+    const window = SDL.SDL_CreateWindow(
+        "Project Oberon",
+        SDL.SDL_WINDOWPOS_CENTERED,
+        SDL.SDL_WINDOWPOS_CENTERED,
+        // @as(c_int, SDL.SDL_WINDOWPOS_UNDEFINED_DISPLAY(display)),
+        // @as(c_int, SDL.SDL_WINDOWPOS_UNDEFINED_DISPLAY(display)),
+        //@as(c_int, 640 * zoom),
+        //@as(c_int, 480 * zoom),
         640,
         480,
-        .{ .vis = .shown },
-    );
-    defer window.destroy();
+        window_flags,
+    ) orelse sdlPanic();
+    defer _ = SDL.SDL_DestroyWindow(window);
 
-    var renderer = try SDL.createRenderer(window, null, .{ .accelerated = true });
-    defer renderer.destroy();
+    const renderer = SDL.SDL_CreateRenderer(window, -1, SDL.SDL_RENDERER_ACCELERATED) orelse sdlPanic();
+    defer _ = SDL.SDL_DestroyRenderer(renderer);
+
+    const texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_ABGR8888, SDL.SDL_TEXTUREACCESS_STREAMING, risc_rect.w, risc_rect.h) orelse sdlPanic();
+
+    const display_rect = SDL.SDL_Rect{ .x = 0, .y = 0, .w = 640, .h = 480 };
+
+    SDL.SDL_ShowWindow(window);
+    _ = SDL.SDL_RenderClear(renderer);
+    _ = SDL.SDL_RenderCopy(renderer, texture, &risc_rect, &display_rect);
 
     mainLoop: while (true) {
-        while (SDL.pollEvent()) |ev| {
-            switch (ev) {
-                .quit => {
-                    break :mainLoop;
-                },
-                .key_down => |key| {
-                    switch (key.scancode) {
-                        .escape => break :mainLoop,
-                        else => std.log.info("key pressed: {}\n", .{key.scancode}),
-                    }
-                },
+        // const frame_start: u32 = SDL.SDL_GetTicks();
+
+        var ev: SDL.SDL_Event = undefined;
+        while (SDL.SDL_PollEvent(&ev) != 0) {
+            switch (ev.type) {
+                SDL.SDL_QUIT => break :mainLoop,
 
                 else => {},
             }
         }
 
-        try renderer.setColorRGB(0, 0, 0);
-        try renderer.clear();
+        _ = SDL.SDL_RenderClear(renderer);
+        _ = SDL.SDL_RenderCopy(renderer, texture, &risc_rect, &display_rect);
 
-        try renderer.setColor(SDL.Color.parse("#F7A41D") catch unreachable);
-        try renderer.drawRect(SDL.Rectangle{
-            .x = 270,
-            .y = 215,
-            .width = 100,
-            .height = 50,
-        });
+        SDL.SDL_RenderPresent(renderer);
 
-        if (target_os.tag != .linux) {
-            // Ubuntu CI doesn't have this function available yet
-            try renderer.drawGeometry(
-                null,
-                &[_]SDL.Vertex{
-                    .{
-                        .position = .{ .x = 400, .y = 150 },
-                        .color = SDL.Color.rgb(255, 0, 0),
-                    },
-                    .{
-                        .position = .{ .x = 350, .y = 200 },
-                        .color = SDL.Color.rgb(0, 0, 255),
-                    },
-                    .{
-                        .position = .{ .x = 450, .y = 200 },
-                        .color = SDL.Color.rgb(0, 255, 0),
-                    },
-                },
-                null,
-            );
+        // const frame_end: u32 = SDL.SDL_GetTicks();
+        // const delay: i32 = frame_start + 1000 / FPS - frame_end;
+        const delay = 16;
+
+        if (delay > 0) {
+            SDL.SDL_Delay(delay);
         }
-
-        renderer.present();
     }
+}
+
+fn sdlPanic() noreturn {
+    const str = @as(?[*:0]const u8, SDL.SDL_GetError()) orelse "unknown error";
+    @panic(std.mem.sliceTo(str, 0));
 }
 
 // test "simple test" {

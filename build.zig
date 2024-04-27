@@ -17,7 +17,7 @@ pub fn build(b: *std.Build) !void {
     sdk.link(risc, .dynamic); // link SDL2 as a shared library
 
     // Add "sdl2" package that exposes the SDL2 api (like SDL_Init or SDL_CreateWindow)
-    risc.root_module.addImport("sdl2", sdk.getWrapperModule());
+    risc.root_module.addImport("sdl2", sdk.getNativeModule());
 
     // Install the executable into the prefix when invoking "zig build"
     b.installArtifact(risc);
