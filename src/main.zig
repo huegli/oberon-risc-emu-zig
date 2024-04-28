@@ -10,7 +10,30 @@ const WHITE: u32 = 0xfdf6e3;
 const MAX_HEIGHT = 2048;
 const MAX_WIDTH = 2048;
 
-const RISC = struct {};
+// ----------------
+// This will eventually go into a seperate file
+
+const Damage = struct {
+    x1: u32,
+    x2: u32,
+    y1: u32,
+    y2: u32,
+};
+
+const RISC = struct {
+    damage: Damage,
+    frame_buffer: [32 * 24]u32,
+};
+
+fn risc_get_framebuffer_damage(risc: RISC) Damage {
+    return risc.damage;
+}
+
+fn risc_get_framebuffer_ptr(risc: RISC) *const [32 * 24]u32 {
+    return &risc.frame_buffer;
+}
+
+// ------------------------
 
 var pixel_buf: [MAX_WIDTH * MAX_HEIGHT]u32 = undefined;
 
@@ -152,22 +175,11 @@ fn scale_display(window: *SDL.SDL_Window, risc_rect: SDL.SDL_Rect, display_rect:
     return scale;
 }
 
-fn update_texture(_: RISC, texture: *SDL.SDL_Texture, risc_rect: SDL.SDL_Rect) void {
-    // struct Damage damage = risc_get_framebuffer_damage(risc);
-    const Damage = struct {
-        x1: u32,
-        x2: u32,
-        y1: u32,
-        y2: u32,
-    };
-    const damage = Damage{
-        .x1 = 0,
-        .x2 = 10,
-        .y1 = 0,
-        .y2 = 10,
-    };
+fn update_texture(risc: RISC, texture: *SDL.SDL_Texture, risc_rect: SDL.SDL_Rect) void {
+    const damage: Damage = risc_get_framebuffer_damage(risc);
+
     if (damage.y1 <= damage.y2) {
-        const in: [1024 * 768]u32 = undefined; // = risg_get_framebuffer_ptr(risc);
+        const in: *const [32 * 24]u32 = risc_get_framebuffer_ptr(risc);
         var out_idx: u32 = 0;
 
         var line: i32 = @intCast(damage.y2);
@@ -179,35 +191,20 @@ fn update_texture(_: RISC, texture: *SDL.SDL_Texture, risc_rect: SDL.SDL_Rect) v
                 var b: u8 = 0;
                 while (b < 32) : (b += 1) {
                     pixel_buf[out_idx] = if ((pixels & 1) == 1) WHITE else BLACK;
-                    pixels = (pixels >> 1);
+                    pixels >>= 1;
                     out_idx += 1;
                 }
             }
         }
     }
-    // if (damage.y1 <= damage.y2) {
-    //   uint32_t *in = risc_get_framebuffer_ptr(risc);
-    //   uint32_t out_idx = 0;
 
-    //   for (int line = damage.y2; line >= damage.y1; line--) {
-    //     int line_start = line * (risc_rect->w / 32);
-    //     for (int col = damage.x1; col <= damage.x2; col++) {
-    //       uint32_t pixels = in[line_start + col];
-    //       for (int b = 0; b < 32; b++) {
-    //         pixel_buf[out_idx] = (pixels & 1) ? WHITE : BLACK;
-    //         pixels >>= 1;
-    //         out_idx++;
-    //       }
-    //     }
-    //   }
+    const rect = SDL.SDL_Rect{
+        .x = @as(c_int, @intCast(damage.x1)) * 32,
+        .y = risc_rect.h - @as(c_int, @intCast(damage.y2)) - 1,
+        .w = (@as(c_int, @intCast(damage.x2)) - @as(c_int, @intCast(damage.x1)) + 1) * 32,
+        .h = (@as(c_int, @intCast(damage.y2)) - @as(c_int, @intCast(damage.y1)) + 1),
+    };
 
-    const rect = SDL.SDL_Rect{ .x = risc_rect.x, .y = risc_rect.y, .w = risc_rect.w, .h = risc_rect.h };
-    //   SDL_Rect rect = {
-    //     .x = damage.x1 * 32,
-    //     .y = risc_rect->h - damage.y2 - 1,
-    //     .w = (damage.x2 - damage.x1 + 1) * 32,
-    //     .h = (damage.y2 - damage.y1 + 1)
-    //   };
     _ = SDL.SDL_UpdateTexture(texture, &rect, &pixel_buf, rect.w * 4);
 }
 
