@@ -4,7 +4,19 @@ const target_os = @import("builtin").os;
 
 const FPS = 60;
 
+const BLACK: u32 = 0x657b83;
+const WHITE: u32 = 0xfdf6e3;
+
+const MAX_HEIGHT = 2048;
+const MAX_WIDTH = 2048;
+
+const RISC = struct {};
+
+var pixel_buf: [MAX_WIDTH * MAX_HEIGHT]u32 = undefined;
+
 pub fn main() !void {
+    const risc: RISC = undefined;
+
     const fullscreen = false;
     var zoom: f32 = 0.0;
 
@@ -76,9 +88,9 @@ pub fn main() !void {
             }
         }
 
+        update_texture(risc, texture, risc_rect);
         _ = SDL.SDL_RenderClear(renderer);
         _ = SDL.SDL_RenderCopy(renderer, texture, &risc_rect, &display_rect);
-
         SDL.SDL_RenderPresent(renderer);
 
         // const frame_end: u32 = SDL.SDL_GetTicks();
@@ -138,6 +150,65 @@ fn scale_display(window: *SDL.SDL_Window, risc_rect: SDL.SDL_Rect, display_rect:
     display_rect.*.y = @intFromFloat((@as(f32, @floatFromInt(win_h)) - h) / 2.0);
 
     return scale;
+}
+
+fn update_texture(_: RISC, texture: *SDL.SDL_Texture, risc_rect: SDL.SDL_Rect) void {
+    // struct Damage damage = risc_get_framebuffer_damage(risc);
+    const Damage = struct {
+        x1: u32,
+        x2: u32,
+        y1: u32,
+        y2: u32,
+    };
+    const damage = Damage{
+        .x1 = 0,
+        .x2 = 10,
+        .y1 = 0,
+        .y2 = 10,
+    };
+    if (damage.y1 <= damage.y2) {
+        const in: [1024 * 768]u32 = undefined; // = risg_get_framebuffer_ptr(risc);
+        var out_idx: u32 = 0;
+
+        var line: i32 = @intCast(damage.y2);
+        while (line >= damage.y1) : (line -= 1) {
+            const line_start: u32 = @intCast(line * @divExact(risc_rect.w, 32));
+            var col: u32 = damage.x1;
+            while (col <= damage.x2) : (col += 1) {
+                var pixels: u32 = in[line_start + col];
+                var b: u8 = 0;
+                while (b < 32) : (b += 1) {
+                    pixel_buf[out_idx] = if ((pixels & 1) == 1) WHITE else BLACK;
+                    pixels = (pixels >> 1);
+                    out_idx += 1;
+                }
+            }
+        }
+    }
+    // if (damage.y1 <= damage.y2) {
+    //   uint32_t *in = risc_get_framebuffer_ptr(risc);
+    //   uint32_t out_idx = 0;
+
+    //   for (int line = damage.y2; line >= damage.y1; line--) {
+    //     int line_start = line * (risc_rect->w / 32);
+    //     for (int col = damage.x1; col <= damage.x2; col++) {
+    //       uint32_t pixels = in[line_start + col];
+    //       for (int b = 0; b < 32; b++) {
+    //         pixel_buf[out_idx] = (pixels & 1) ? WHITE : BLACK;
+    //         pixels >>= 1;
+    //         out_idx++;
+    //       }
+    //     }
+    //   }
+
+    const rect = SDL.SDL_Rect{ .x = risc_rect.x, .y = risc_rect.y, .w = risc_rect.w, .h = risc_rect.h };
+    //   SDL_Rect rect = {
+    //     .x = damage.x1 * 32,
+    //     .y = risc_rect->h - damage.y2 - 1,
+    //     .w = (damage.x2 - damage.x1 + 1) * 32,
+    //     .h = (damage.y2 - damage.y1 + 1)
+    //   };
+    _ = SDL.SDL_UpdateTexture(texture, &rect, &pixel_buf, rect.w * 4);
 }
 
 // test "simple test" {
