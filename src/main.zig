@@ -22,32 +22,30 @@ const Damage = struct {
 
 const RISC = struct {
     damage: Damage,
-    frame_buffer: [32 * 24]u32,
+    frame_buffer: [32 * 768]u32,
 };
 
 fn risc_get_framebuffer_damage(risc: *RISC) Damage {
     risc.damage.x1 = 0;
     risc.damage.x2 = 31;
     risc.damage.y1 = 0;
-    risc.damage.y2 = 23;
+    risc.damage.y2 = 767;
     return risc.damage;
 }
 
-fn risc_get_framebuffer_ptr(risc: *RISC) *[32 * 24]u32 {
-    for (risc.frame_buffer) |i| {
-        if (i >= 32 * 24) break;
+fn risc_get_framebuffer_ptr(risc: *RISC) *[32 * 768]u32 {
+    var i: u32 = 0;
+    while (i < 32 * 768) : (i += 1) {
         if (i % 2 == 0) {
-            risc.frame_buffer[i] = WHITE;
+            risc.frame_buffer[i] = 0xFFFFFFFF;
         } else {
-            risc.frame_buffer[i] = BLACK;
+            risc.frame_buffer[i] = 0x00000000;
         }
     }
     return &risc.frame_buffer;
 }
 
 // ------------------------
-
-var pixel_buf: [MAX_WIDTH * MAX_HEIGHT]u32 = undefined;
 
 pub fn main() !void {
     var risc: RISC = undefined;
@@ -188,10 +186,13 @@ fn scale_display(window: *SDL.SDL_Window, risc_rect: SDL.SDL_Rect, display_rect:
 }
 
 fn update_texture(risc: *RISC, texture: *SDL.SDL_Texture, risc_rect: SDL.SDL_Rect) void {
+    // var pixel_buf: [MAX_WIDTH * MAX_HEIGHT]u32 = undefined;
+    var pixel_buf: [1024 * 768]u32 = undefined;
+
     const damage: Damage = risc_get_framebuffer_damage(risc);
 
     if (damage.y1 <= damage.y2) {
-        const in: *[32 * 24]u32 = risc_get_framebuffer_ptr(risc);
+        const in: *[32 * 768]u32 = risc_get_framebuffer_ptr(risc);
         var out_idx: u32 = 0;
 
         var line: i32 = @intCast(damage.y2);
@@ -200,8 +201,8 @@ fn update_texture(risc: *RISC, texture: *SDL.SDL_Texture, risc_rect: SDL.SDL_Rec
             var col: u32 = damage.x1;
             while (col <= damage.x2) : (col += 1) {
                 var pixels: u32 = in[line_start + col];
-                var b: u8 = 0;
-                std.debug.print("line: {}, col: {} line_start: {} pixels: {}\n", .{ line, col, line_start, pixels });
+                var b: u32 = 0;
+                // std.debug.print("line: {}, col: {} line_start: {} pixels: {}\n", .{ line, col, line_start, pixels });
                 while (b < 32) : (b += 1) {
                     pixel_buf[out_idx] = if ((pixels & 1) == 1) WHITE else BLACK;
                     pixels >>= 1;
